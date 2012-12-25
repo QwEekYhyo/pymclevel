@@ -26,3 +26,6 @@ _nbt.pyd
 .venv
 ENV
 
+profile.dat
+profile.dot
+profile.png
