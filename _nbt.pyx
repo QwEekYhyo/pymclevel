@@ -286,7 +286,7 @@ cdef swab(void * vbuf, int nbytes):
     #print "to", 
     #if not needswap: return
     cdef int i
-    for i in range((nbytes+1)/2):
+    for i in range((nbytes+1) // 2):
         buf[i], buf[nbytes-i-1] = buf[nbytes-i-1], buf[i]
     #for i in range(nbytes): print buf[i],
 
@@ -580,7 +580,7 @@ cdef save_byte_array(object value, object buf):
 cdef save_int_array(object value, object buf):
     value = value.tostring()
     cdef char * s = value
-    cdef unsigned int length = len(value) / 4
+    cdef unsigned int length = len(value) // 4
     swab(&length, 4)
     cwrite(buf, <char *>&length, 4)
     cwrite(buf, s, len(value))
