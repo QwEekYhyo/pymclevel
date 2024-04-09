@@ -408,7 +408,7 @@ class MCServerChunkGenerator(object):
                 if simulate:
                     duration = time.time() - startTime
 
-                    simSeconds = int(duration) + 1
+                    simSeconds = max(8, int(duration) + 1)
 
                     for i in range(simSeconds):
                         # process tile ticks
@@ -708,17 +708,11 @@ class InfdevChunk(LightedChunk):
 
     @classmethod
     def compressTagGzip(cls, root_tag):
-        buf = StringIO()
-        with closing(gzip.GzipFile(fileobj=buf, mode='wb', compresslevel=2)) as gzipper:
-            root_tag.save(buf=gzipper)
-
-        return buf.getvalue()
+        return root_tag.save()
 
     @classmethod
     def compressTagDeflate(cls, root_tag):
-        buf = StringIO()
-        root_tag.save(buf=buf)
-        return deflate(buf.getvalue())
+        return deflate(root_tag.save(compressed=False))
 
     def _compressChunk(self):
         root_tag = self.root_tag
@@ -800,7 +794,8 @@ class InfdevChunk(LightedChunk):
                 self._decompressChunk()
 
             except Exception, e:
-                error(u"Malformed NBT data in file: {0} ({1})".format(self.filename, e))
+                msg = u"Malformed NBT data in file: {0} ({1!r})".format(self.filename, e)
+                error(msg)
                 if self.world:
                     self.world.malformedChunk(*self.chunkPosition)
                 raise ChunkMalformed((e,), sys.exc_info()[2])
@@ -808,7 +803,8 @@ class InfdevChunk(LightedChunk):
             try:
                 self.shapeChunkData()
             except KeyError, e:
-                error(u"Incorrect chunk format in file: {0} ({1})".format(self.filename, e))
+                msg = u"Incorrect chunk format in file: {0} ({1!r})".format(self.filename, e)
+                error(msg)
                 if self.world:
                     self.world.malformedChunk(*self.chunkPosition)
                 raise ChunkMalformed((e,), sys.exc_info()[2])
@@ -2720,7 +2716,7 @@ class MCInfdevOldLevel(ChunkedLevelMixin, EntityLevel):
                     chunk.root_tag = nbt.load(buf=data)
 
         except Exception, e:
-            raise ChunkMalformed("Chunk {0} had an error: {1!r}".format(chunk.chunkPosition, e), sys.exc_info()[2])
+            raise ChunkMalformed, "Chunk {0} had an error: {1!r}".format(chunk.chunkPosition, e), sys.exc_info()[2]
 
     def _saveChunk(self, chunk):
         cx, cz = chunk.chunkPosition
@@ -2872,8 +2868,8 @@ class MCInfdevOldLevel(ChunkedLevelMixin, EntityLevel):
 
         c = self._getChunkUnloaded(cx, cz)
         c.load()
-        if not (cx, cz) in self._loadedChunks:
-            raise ChunkMalformed("Chunk {0} malformed".format((cx, cz)))
+        if (cx, cz) not in self._loadedChunks:
+            raise ChunkMalformed, "Chunk {0} malformed".format((cx, cz)), sys.exc_info()[2]
             self.world.malformedChunk(*self.chunkPosition)
 
         return c
@@ -3332,8 +3328,7 @@ class ZipSchematic (MCInfdevOldLevel):
             raise NotImplementedError("Cannot save zipfiles yet!")
 
         with closing(self.zipfile.open("level.dat")) as f:
-            with closing(gzip.GzipFile(fileobj=StringIO(f.read()))) as g:
-                self.root_tag = nbt.load(buf=g.read())
+            self.root_tag = nbt.load(buf=f)
 
     def chunkFilename(self, x, z):
         s = "/".join((self.dirhash(x), self.dirhash(z),
