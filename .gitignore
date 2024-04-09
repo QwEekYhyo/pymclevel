@@ -21,5 +21,6 @@ _nbt.c
 _nbt.so
 
 # The "standard" virtualenv directory.
+.venv
 ENV
 _nbt.pyd
