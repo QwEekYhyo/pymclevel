@@ -159,7 +159,7 @@ class MCMaterials(object):
             f = file(join(root, filename))
         try:
             info(u"Loading block info from %s", f)
-            blockyaml = yaml.load(f)
+            blockyaml = yaml.safe_load(f)
             self.addYamlBlocks(blockyaml)
 
         except Exception, e:
