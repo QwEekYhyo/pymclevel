@@ -335,7 +335,7 @@ cdef load_buffer(bytes buf):
     if len(buf) < 1: 
         raise NBTFormatError, "NBT Stream too short!"
     
-    if should_dump: print dump(buf)
+    #if should_dump: print dump(buf)
     assert ctx.buffer[0] == TAG_COMPOUND, "Data is not a TAG_Compound (found %d)" % ctx.buffer[0]
     name = load_string(ctx)
     #print "Root name", name
