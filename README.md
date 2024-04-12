@@ -1,21 +1,24 @@
-Python library for reading Minecraft levels.
+# PyMCLevel
+
+Python library to read Minecraft levels.
 
 Can read Alpha levels, Indev levels, and Creative levels (with help).
 
 Includes a command-line client (mce.py)
 
-Requires numpy and PyYaml.
+Requires numpy and PyYaml. (Optionally Pillow)
 
 Read mclevel.py to get started.
 
 See LICENSE.txt for licensing terms.
 
-
+## Usage
 
 mce.py is a command-line editor for SMP maps. It can be used interactively from a terminal, accept editing commands on standard input, or run a single editing command from the shell.
 
 Sample usage:
 
+```
 $ python mce.py
 
     Usage:
@@ -125,3 +128,4 @@ INFO:SkyLight Pass 13: 0 chunks
 INFO:Completed in 0:00:02.024000, 0:00:00.337333 per chunk
 INFO:Saved 20 chunks
 World4>
+```
