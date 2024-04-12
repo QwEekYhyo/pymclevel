@@ -458,7 +458,7 @@ class mce(object):
             btypes += ch.Blocks.ravel()
             counts = bincount(btypes)
 
-            blockCounts[:counts.shape[0]] += counts
+            blockCounts[:counts.shape[0]] += counts.astype(numpy.uint64)
             sizeOnDisk += ch.compressedSize()
             ch.unload()
             if i % 100 == 0:
