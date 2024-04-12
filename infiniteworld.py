@@ -7,11 +7,9 @@ Created on Jul 22, 2011
 # **FIXME** WindowsError is the name of a built-in Exception, but pyflakes doesn't seem to know that.  -zothar
 from collections import deque
 from contextlib import closing
-from cStringIO import StringIO
 from datetime import datetime
 from entity import Entity, TileEntity
 from faces import FaceXDecreasing, FaceXIncreasing, FaceZDecreasing, FaceZIncreasing
-import gzip
 import itertools
 from logging import getLogger
 from materials import alphaMaterials, namedMaterials
@@ -31,13 +29,17 @@ import subprocess
 import sys
 import tempfile
 import urllib
-
-log = getLogger(__name__)
-warn, error, info, debug = log.warn, log.error, log.info, log.debug
-
 import blockrotation
 from box import BoundingBox
 from level import LightedChunk, EntityLevel, computeChunkHeightMap
+import re
+from level import ChunkBase
+from zipfile import ZipFile, is_zipfile
+import tempfile
+
+
+log = getLogger(__name__)
+warn, error, info, debug = log.warn, log.error, log.info, log.debug
 
 # infinite
 Level = 'Level'
@@ -67,16 +69,8 @@ DIM_END = 1
 
 __all__ = ["ZeroChunk", "InfdevChunk", "ChunkedLevelMixin", "MCInfdevOldLevel", "MCAlphaDimension", "ZipSchematic"]
 
-import re
-
 convert = lambda text: int(text) if text.isdigit() else text
 alphanum_key = lambda key: [convert(c) for c in re.split('([0-9]+)', key)]
-
-
-def sort_nicely(l):
-    """ Sort the given list in the way that humans expect.
-    """
-    l.sort(key=alphanum_key)
 
 
 # Thank you, Stackoverflow
@@ -103,6 +97,7 @@ def which(program):
                     return exe_file
 
     return None
+
 
 if sys.platform == "win32":
     appSupportDir = os.path.join(appDataDir, u"pymclevel")
@@ -532,9 +527,8 @@ class MCServerChunkGenerator(object):
                 if level.containsChunk(cx, cz):
                     chunks.discard((cx, cz))
                 elif ((cx, cz) in chunks
-                    and tempWorld.containsChunk(cx, cz)
-                    and tempWorld.getChunk(cx, cz).TerrainPopulated
-                    ):
+                        and tempWorld.containsChunk(cx, cz)
+                        and tempWorld.getChunk(cx, cz).TerrainPopulated):
                     self.copyChunkAtPosition(tempWorld, level, cx, cz)
                     i += 1
                     chunks.discard((cx, cz))
@@ -563,13 +557,12 @@ class MCServerChunkGenerator(object):
             memflags = ["-Xmx1024M", "-Xms1024M", ]
 
         proc = subprocess.Popen([cls.javaExe, "-Djava.awt.headless=true"] + memflags + ["-jar", jarfile],
-            executable=cls.javaExe,
-            cwd=startingDir,
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            universal_newlines=True,
-            )
+                                executable=cls.javaExe,
+                                cwd=startingDir,
+                                stdin=subprocess.PIPE,
+                                stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE,
+                                universal_newlines=True)
         return proc
 
     def _serverVersion(self):
@@ -613,6 +606,7 @@ class MCServerChunkGenerator(object):
 
         return version
 
+
 _zeros = {}
 
 
@@ -621,8 +615,6 @@ def ZeroChunk(height=512):
     if z is None:
         z = _zeros[height] = _ZeroChunk(height)
     return z
-
-from level import ChunkBase
 
 
 class _ZeroChunk(ChunkBase):
@@ -663,8 +655,8 @@ class InfdevChunk(LightedChunk):
     arrays are automatically unpacked from nibble arrays into byte arrays
     for better handling.
     """
-    @property
 
+    @property
     def filename(self):
         if self.world.version:
             cx, cz = self.chunkPosition
@@ -780,9 +772,9 @@ class InfdevChunk(LightedChunk):
 
     def decompress(self):
         """called when accessing attributes decorated with @decompress_first"""
-        if not self in self.world.decompressedChunkQueue:
+        if self not in self.world.decompressedChunkQueue:
 
-            if self.root_tag != None:
+            if self.root_tag is not None:
                 return
             if self.compressedTag is None:
                 if self.root_tag is None:
@@ -800,7 +792,7 @@ class InfdevChunk(LightedChunk):
                 error(msg)
                 if self.world:
                     self.world.malformedChunk(*self.chunkPosition)
-                raise ChunkMalformed, msg, sys.exc_info()[2]
+                raise ChunkMalformed(msg), None, sys.exc_info()[2]
 
             try:
                 self.shapeChunkData()
@@ -809,7 +801,7 @@ class InfdevChunk(LightedChunk):
                 error(msg)
                 if self.world:
                     self.world.malformedChunk(*self.chunkPosition)
-                raise ChunkMalformed, msg, sys.exc_info()[2]
+                raise ChunkMalformed(msg), None, sys.exc_info()[2]
 
             self.dataIsPacked = True
         self.world.chunkDidDecompress(self)
@@ -889,7 +881,7 @@ class InfdevChunk(LightedChunk):
                 error(msg)
                 if self.world:
                     self.world.malformedChunk(*self.chunkPosition)
-                raise ChunkMalformed, msg, sys.exc_info()[2]
+                raise ChunkMalformed(msg), None, sys.exc_info()[2]
 
             self.world.chunkDidLoad(self)
             self.world.chunkDidDecompress(self)
@@ -909,7 +901,7 @@ class InfdevChunk(LightedChunk):
         return not (self.compressedTag is None and self.root_tag is None)
 
     def isCompressed(self):
-        return self.isLoaded() and self.root_tag == None
+        return self.isLoaded() and self.root_tag is None
 
     def generateHeightMap(self):
         if self.world.dimNo == DIM_NETHER:
@@ -1239,7 +1231,7 @@ class MCRegionFile(object):
             for i in xrange(sector, sector + count):
                 if i >= len(self.freeSectors):
                     # raise RegionMalformed("Region file offset table points to sector {0} (past the end of the file)".format(i))
-                    print  "Region file offset table points to sector {0} (past the end of the file)".format(i)
+                    print "Region file offset table points to sector {0} (past the end of the file)".format(i)
                     needsRepair = True
                     break
                 if self.freeSectors[i] is False:
@@ -1503,6 +1495,7 @@ class MCRegionFile(object):
     VERSION_DEFLATE = 2
 
     compressMode = VERSION_DEFLATE
+
 
 base36alphabet = "0123456789abcdefghijklmnopqrstuvwxyz"
 
@@ -1952,12 +1945,12 @@ class ChunkedLevelMixin(object):
 
         def splitChunkLists(chunkLists):
             newChunkLists = []
-            for l in chunkLists:
+            for chunks in chunkLists:
 
                 # list is already sorted on x position, so this splits into left and right
 
-                smallX = l[:len(l) / 2]
-                bigX = l[len(l) / 2:]
+                smallX = chunks[:len(chunks) / 2]
+                bigX = chunks[len(chunks) / 2:]
 
                 # sort halves on z position
                 smallX = sorted(smallX, key=reverseChunkPosition)
@@ -2113,10 +2106,11 @@ class ChunkedLevelMixin(object):
                         print "Chunk error during relight, chunk skipped: ", e
                         continue
 
-                    for dir, dx, dz in ((FaceXDecreasing, -1, 0),
-                                          (FaceXIncreasing, 1, 0),
-                                          (FaceZDecreasing, 0, -1),
-                                          (FaceZIncreasing, 0, 1)):
+                    for dir, dx, dz in (
+                                    (FaceXDecreasing, -1, 0),
+                                    (FaceXIncreasing, 1, 0),
+                                    (FaceZDecreasing, 0, -1),
+                                    (FaceZIncreasing, 0, 1)):
                         try:
                             neighboringChunks[dir] = self.getChunk(cx + dx, cz + dz)
                         except (ChunkNotPresent, ChunkMalformed):
@@ -2270,7 +2264,6 @@ class ChunkedLevelMixin(object):
             ch.needsLighting = False
 
 
-
 class MCInfdevOldLevel(ChunkedLevelMixin, EntityLevel):
     materials = alphaMaterials
     isInfinite = True
@@ -2374,7 +2367,7 @@ class MCInfdevOldLevel(ChunkedLevelMixin, EntityLevel):
 
     def create(self, filename, random_seed, last_played):
 
-        if filename == None:
+        if filename is None:
             raise ValueError("Can't create an Infinite level without a filename!")
         # create a new level
         root_tag = nbt.TAG_Compound()
@@ -2396,9 +2389,6 @@ class MCInfdevOldLevel(ChunkedLevelMixin, EntityLevel):
         self.SizeOnDisk = 0
         self.Time = 1
         self.LevelName = os.path.basename(self.worldDir)
-
-        ### if singleplayer:
-
         self.createPlayer("Player")
 
         if not os.path.exists(self.worldDir):
@@ -2523,23 +2513,23 @@ class MCInfdevOldLevel(ChunkedLevelMixin, EntityLevel):
     def preloadDimensions(self):
         worldDirs = os.listdir(self.worldDir)
 
-        for dirname in worldDirs:
-            if dirname.startswith("DIM"):
+        for directory_name in worldDirs:
+            if directory_name.startswith("DIM"):
                 try:
-                    intInDirname = re.findall("\\d+", dirname)
-                    if len(intInDirname)>0:
+                    intInDirname = re.findall("\\d+", directory_name)
+                    if len(intInDirname) > 0:
                         dimNo = int(intInDirname[-1])
                     else:
-                        dimNo = 999 #identical dimNo should not matter
-                    info("Found dimension {0}".format(dirname))
-                    dim = MCAlphaDimension(self, dimNo, dirname)
-                    self.dimensions[dirname] = dim
+                        dimNo = 999   # identical dimNo should not matter
+                    info("Found dimension {0}".format(directory_name))
+                    dim = MCAlphaDimension(self, dimNo, directory_name)
+                    self.dimensions[directory_name] = dim
                 except Exception, e:
-                    error(u"Error loading dimension {0}: {1}".format(dirname, e))
+                    error(u"Error loading dimension {0}: {1}".format(directory_name, e))
 
     def getDimension(self, dimNo, dirname=None):
         if dirname is None:
-            dirname="DIM" + str(int(dimNo))
+            dirname = "DIM" + str(int(dimNo))
 
         if self.dimNo != 0:
             return self.parentWorld.getDimension(dimNo, dirname)
@@ -2638,14 +2628,14 @@ class MCInfdevOldLevel(ChunkedLevelMixin, EntityLevel):
         worldDirs = os.listdir(self.worldDir)
         self._allChunks = set()
 
-        for dirname in worldDirs:
-            if dirname in self.dirhashes:
-                subdirs = os.listdir(os.path.join(self.worldDir, dirname))
+        for directory_name in worldDirs:
+            if directory_name in self.dirhashes:
+                subdirs = os.listdir(os.path.join(self.worldDir, directory_name))
                 for subdirname in subdirs:
                     if subdirname in self.dirhashes:
-                        filenames = os.listdir(os.path.join(self.worldDir, dirname, subdirname))
+                        filenames = os.listdir(os.path.join(self.worldDir, directory_name, subdirname))
                         # def fullname(filename):
-                            # return os.path.join(self.worldDir, dirname, subdirname, filename)
+                        #     return os.path.join(self.worldDir, directory_name, subdirname, filename)
 
                         # fullpaths = map(fullname, filenames)
                         bits = map(lambda x: x.split('.'), filenames)
@@ -2684,7 +2674,7 @@ class MCInfdevOldLevel(ChunkedLevelMixin, EntityLevel):
         self.decompressedChunkQueue.discard(chunk)
 
     def chunkDidDecompress(self, chunk):
-        if not chunk in self.decompressedChunkQueue:
+        if chunk not in self.decompressedChunkQueue:
             self.decompressedChunkQueue.append(chunk)
             if self.decompressedChunkLimit and (len(self.decompressedChunkQueue) > self.decompressedChunkLimit):
                 oldestChunk = self.decompressedChunkQueue[0]
@@ -2739,7 +2729,7 @@ class MCInfdevOldLevel(ChunkedLevelMixin, EntityLevel):
         except MemoryError:
             raise
         except Exception, e:
-            raise ChunkMalformed, "Chunk {0} had an error: {1!r}".format(chunk.chunkPosition, e), sys.exc_info()[2]
+            raise ChunkMalformed("Chunk {0} had an error: {1!r}".format(chunk.chunkPosition, e)), None, sys.exc_info()[2]
 
     def _saveChunk(self, chunk):
         cx, cz = chunk.chunkPosition
@@ -2788,8 +2778,10 @@ class MCInfdevOldLevel(ChunkedLevelMixin, EntityLevel):
         return os.path.join(self.regionDir, "r.%s.%s.%s" % (rx, rz, EXTENSION))
 
     def chunkFilename(self, cx, cz):
-        s = os.path.join(self.worldDir, self.dirhash(cx), self.dirhash(cz),
-                                     "c.%s.%s.dat" % (base36(cx), base36(cz)))
+        s = os.path.join(self.worldDir,
+                         self.dirhash(cx),
+                         self.dirhash(cz),
+                         "c.%s.%s.dat" % (base36(cx), base36(cz)))
         return s
 
     def chunkFilenameAt(self, x, y, z):
@@ -2892,8 +2884,8 @@ class MCInfdevOldLevel(ChunkedLevelMixin, EntityLevel):
         c = self._getChunkUnloaded(cx, cz)
         c.load()
         if (cx, cz) not in self._loadedChunks:
-            raise ChunkMalformed, "Chunk {0} malformed".format((cx, cz)), sys.exc_info()[2]
             self.world.malformedChunk(*self.chunkPosition)
+            raise ChunkMalformed("Chunk {0} malformed".format((cx, cz))), None, sys.exc_info()[2]
 
         return c
 
@@ -2943,7 +2935,7 @@ class MCInfdevOldLevel(ChunkedLevelMixin, EntityLevel):
 
     def addTileEntity(self, tileEntityTag):
         assert isinstance(tileEntityTag, nbt.TAG_Compound)
-        if not 'x' in tileEntityTag:
+        if 'x' not in tileEntityTag:
             return
         x, y, z = TileEntity.pos(tileEntityTag)
 
@@ -3165,7 +3157,7 @@ class MCInfdevOldLevel(ChunkedLevelMixin, EntityLevel):
 
         # Check for the Abilities tag.  It will be missing in worlds from before
         # Beta 1.9 Prerelease 5.
-        if not 'abilities' in playerTag:
+        if 'abilities' not in playerTag:
             playerTag['abilities'] = nbt.TAG_Compound()
 
         # Assumes creative (1) is the only mode with these abilities set,
@@ -3244,9 +3236,6 @@ class MCAlphaDimension (MCInfdevOldLevel):
             MCInfdevOldLevel.saveInPlace(self)
         else:
             self.parentWorld.saveInPlace()
-
-from zipfile import ZipFile, is_zipfile
-import tempfile
 
 
 class ZipSchematic (MCInfdevOldLevel):
@@ -3356,5 +3345,5 @@ class ZipSchematic (MCInfdevOldLevel):
 
     def chunkFilename(self, x, z):
         s = "/".join((self.dirhash(x), self.dirhash(z),
-                                     "c.%s.%s.dat" % (base36(x), base36(z))))
+                     "c.%s.%s.dat" % (base36(x), base36(z))))
         return s
